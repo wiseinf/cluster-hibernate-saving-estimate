@@ -3,21 +3,93 @@
 ## Introduction
 
 `cluster-hibernate-saving-estimate` is a tool for estimating saving when using cluster hibernate for kubernetes clusters.
+Currently, it supports **Amazon AWS** and **Alibaba Cloud**.
 
 ## Prerequisites
+
+### For Amazon AWS
+
+1. A kubernetes cluster using Amazon AWS EKS.
+1. A kubeconfig file for the cluster with following permissions:
+
+    | Resources | Permissions | Description |
+    | --- | --- | --- |
+    | Node | List | list nodes. |
+    | Pod | List | list pods. |
+    | Namespace | List | list namespaces. |
+    | Deployment| List | list deployment. |
+    | CronJob | List  | list cron jobs. |
+
+    The permissions file is as follows:
+    ```yaml
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: optimizer
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - nodes
+          - pods
+          - namespaces
+        verbs:
+          - list
+      - apiGroups:
+          - "apps/v1"
+        resources:
+          - deployments
+        verbs:
+          - list
+      - apiGroups:
+          - "batch/v1"
+        resources:
+          - cronjobs
+        verbs:
+          - list
+    ```
+1. An Access Key & Secret needs to be provided, and its permission policy is as follows:
+    ```json
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "Optimizer",
+          "Effect": "Allow",
+          "Action": [
+            "ec2:DescribeInstances",
+            "ec2:DescribeReservedInstances",
+            "ec2:DescribeLaunchTemplates",
+            "ec2:DescribeRegions",
+            "ec2:DescribeVolumes",
+            "ec2:DescribeLaunchTemplateVersions",
+            "eks:DescribeNodegroup",
+            "eks:ListNodegroups",
+            "eks:DescribeCluster",
+            "eks:ListClusters"
+            "autoscaling:DescribeAutoScalingInstances",
+            "autoscaling:DescribeAutoScalingGroups",
+          ],
+          "Resource": "*"
+        }
+      ]
+    }
+    ```
+
+### For Alibaba Cloud
 
 1. A kubernetes cluster using Alibaba Cloud ACK.
 1. A kubeconfig file for the cluster with following permissions:
 
-    | 资源 | 权限 | 说明 |
+    | Resources | Permissions | Description |
     | --- | --- | --- |
-    | Node | List | 获取节点信息 |
-    | Pod | List | 获取Pod信息 |
-    | Namespace | List | 获取Namespace信息 |
-    | Deployment| List | 获取Deployment信息 |
-    | CronJob | List  | 获取CronJob信息 |
+    | Node | List | list nodes. |
+    | Pod | List | list pods. |
+    | Namespace | List | list namespaces. |
+    | Deployment| List | list deployment. |
+    | CronJob | List  | list cron jobs. |
 
-    权限文件如下：
+    The permissions file is as follows:
     ```yaml
     apiVersion: rbac.authorization.k8s.io/v1
     kind: ClusterRole
@@ -48,12 +120,11 @@
 
 1. A access key id and secret for Alibaba Cloud.
 
-    | 服务 | 权限 | 说明 |
     | --- | --- | --- |
-    | 云服务器（ECS） | ecs:DescribeInstances | 获取实例信息 |
-    | 容器服务Kubernetes版（CS） |  cs:DescribeClusterNodePools<br/> cs:DescribeClusterNodePoolDetail<br/> cs:DescribeClusterNodes | 获取集群、节点池、节点等信息 |
+    | Elastic Compute Service (ECS) | ecs:DescribeDisks<br/> ecs:DescribeInstances<br/> ecs:DescribeRegions | This permission is required to obtain disk, instance and region information |
+    | Container Service Kubernetes (CS) | cs:DescribeClusterNodePools<br/> cs:DescribeClusterNodePoolDetail<br/> cs:DescribeClusters <br/> cs:DescribeClusterUserKubeconfig<br/> cs:DescribeClusterNodes | This permission is required to obtain the cluster, node group, Node, Kubeconfig and other information |
 
-    其权限策略文件描述如下，您可以直接在阿里云控制台中导入该策略，具体请参考[通过脚本编辑模式创建自定义权限策略](https://help.aliyun.com/zh/ram/user-guide/create-a-custom-policy#section-kwn-gu8-48m)
+    The permission policy file is described as follows. You can import the policy directly in the Alibaba Cloud console. For details, please refer to [Creating a custom policy through script editing mode](https://help.aliyun.com/zh/ram/user-guide/create-a-custom-policy#section-kwn-gu8-48m)
     ```json
     {
       "Version": "1",
@@ -90,10 +161,10 @@
 1. Go to the `cluster-hibernate-saving-estimate` directory and run command:
 
     ```sh
-    ./bin/${arch}/cluster-hibernate-saving-estimate --kubeconfig=kubeconfigPath --access-key-id=your_access_key_id --access-key-secret=your_access_key_secret --hibernate-cron="0 10 * * *" --awaken-cron="0 8 * * *" --format=text --output=cluster-hibernate-saving-estimate.txt
+    ./bin/${arch}/cluster-hibernate-saving-estimate --cloud=aws --kubeconfig=kubeconfigPath --access-key-id=your_access_key_id --access-key-secret=your_access_key_secret --hibernate-cron="0 10 * * *" --awaken-cron="0 8 * * *" --format=text --output=cluster-hibernate-saving-estimate.txt
     ```
 
-    In which, `${arch}` depends on your platform, currently, `${arch}` can be `linux-amd64`(which runs on linux amd64 archtecture) or `darwin-amd64`(which runs on mac os amd64 archtecture). `--kubeconfig` is a path to a kubeconfig file. `--access-key-id` and `--access-key-secret` are your access key id and secret. `--hibernate-cron` and `--awaken-cron` are cron expressions for hibernation and awakening schedule, respectively. `--format` is the output format, default is text, available values are text and json. `--output` is the output file location, default is `cluster-hibernate-saving-estimate.txt`.
+    In which, `${arch}` depends on your platform, currently, `${arch}` can be `linux-amd64`(which runs on linux amd64 archtecture) or `darwin-amd64`(which runs on mac os amd64 archtecture). `--cloud` is the cloud provider, available values are `aws`(amazon aws) and `acs` (alibaba cloud).`--kubeconfig` is a path to a kubeconfig file. `--access-key-id` and `--access-key-secret` are your access key id and secret. `--hibernate-cron` and `--awaken-cron` are cron expressions for hibernation and awakening schedule, respectively. `--format` is the output format, default is text, available values are text and json. `--output` is the output file location, default is `cluster-hibernate-saving-estimate.txt`.
 
 1. The output file will be generated in the current directory. For example:
 
